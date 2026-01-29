@@ -15,6 +15,8 @@ pip install url-backoff-registry
 
 ## Usage
 
+### Basic usage
+
 ```python
 from url_backoff_registry import BackoffRegistry
 
@@ -32,14 +34,53 @@ def fetch(url):
     except Exception:
         registry.record_failure(url)
         raise
+```
 
-# Check when backoff ends
-if registry.should_backoff(url):
-    retry_at = registry.next_retry_at(url)
-    print(f"Retry after {retry_at}")
+### Decorator
 
-# Clear backoff manually (e.g., after a successful request)
-registry.clear(url)
+Use the `@track` decorator to automatically record failures and clear on success:
+
+```python
+from url_backoff_registry import BackoffError, BackoffRegistry
+
+registry = BackoffRegistry()
+
+@registry.track("https://api.example.com")
+def fetch_data():
+    response = requests.get("https://api.example.com/data")
+    response.raise_for_status()
+    return response.json()
+
+try:
+    data = fetch_data()
+except BackoffError as e:
+    print(f"Backing off until {e.until}")
+except requests.RequestException:
+    print("Request failed, failure recorded")
+```
+
+### Per-key rules
+
+Set different thresholds for different endpoints:
+
+```python
+registry = BackoffRegistry(threshold=3)  # Default: 3 failures
+
+# Flaky API: back off after just 1 failure, for 5 minutes
+registry.set_rule("https://flaky-api.com", threshold=1, backoff_seconds=300)
+
+# Critical API: more lenient, 5 failures before backing off
+registry.set_rule("https://critical-api.com", threshold=5)
+```
+
+### Stats and introspection
+
+```python
+stats = registry.stats("https://api.example.com")
+# {'failures_in_window': 2, 'in_backoff': False, 'backoff_until': None}
+
+all_keys = registry.keys()
+# ['https://api.example.com', 'https://other-api.com']
 ```
 
 ## API
@@ -59,6 +100,18 @@ registry.clear(url)
 - `should_backoff(key)` - Returns `True` if currently in backoff
 - `next_retry_at(key)` - Returns datetime when backoff ends, or `None`
 - `clear(key)` - Clear backoff and failure history for the key
+- `set_rule(key, ...)` - Set custom thresholds for a specific key
+- `clear_rule(key)` - Remove custom rule, revert to defaults
+- `stats(key)` - Get failure count, backoff status, and backoff end time
+- `keys()` - List all keys with recorded failures or in backoff
+- `track(key, clear_on_success=True)` - Decorator for automatic tracking
+
+### `BackoffError`
+
+Raised by `@track` when a call is attempted while in backoff.
+
+- `key` - The key that is in backoff
+- `until` - Datetime when backoff ends
 
 ## FAQ
 
