@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from url_backoff_utils import BackoffRegistry
+from url_backoff_registry import BackoffRegistry
 
 
 def test_backoff_triggers():
