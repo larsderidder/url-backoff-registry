@@ -1,6 +1,7 @@
 # url-backoff-registry
 
 [![PyPI version](https://badge.fury.io/py/url-backoff-registry.svg)](https://pypi.org/project/url-backoff-registry/)
+[![CI](https://github.com/larsderidder/url-backoff-registry/actions/workflows/ci.yml/badge.svg)](https://github.com/larsderidder/url-backoff-registry/actions/workflows/ci.yml)
 
 In-memory URL backoff registry with sliding window thresholds.
 
