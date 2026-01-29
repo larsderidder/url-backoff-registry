@@ -1,5 +1,7 @@
 # url-backoff-registry
 
+[![PyPI version](https://badge.fury.io/py/url-backoff-registry.svg)](https://pypi.org/project/url-backoff-registry/)
+
 In-memory URL backoff registry with sliding window thresholds.
 
 Track failing endpoints and back off when failures exceed a threshold within a time window. Useful for avoiding repeated requests to flaky or overloaded services.
@@ -56,6 +58,26 @@ registry.clear(url)
 - `should_backoff(key)` - Returns `True` if currently in backoff
 - `next_retry_at(key)` - Returns datetime when backoff ends, or `None`
 - `clear(key)` - Clear backoff and failure history for the key
+
+## FAQ
+
+### How is this different from the `backoff` package?
+
+The [`backoff`](https://pypi.org/project/backoff/) package provides decorators for retrying a single function call with exponential backoff. It's great for "retry this request up to 3 times with increasing delays."
+
+This package solves a different problem: tracking failures **across multiple calls** to decide whether to attempt a request at all. It answers "should I even try this URL right now, given its recent failure history?"
+
+| | `backoff` | `url-backoff-registry` |
+|---|---|---|
+| Scope | Single function call | Cross-call state |
+| Mechanism | Retry decorator | Failure registry |
+| Question answered | "How many times should I retry?" | "Should I try at all?" |
+
+They're complementary - you can use both together.
+
+### Why not just use a circuit breaker?
+
+Circuit breakers (like `pybreaker`) are similar but typically operate per-function. This registry is keyed by URL/endpoint, so you can track failures for many endpoints with a single registry instance. It's lighter weight and doesn't require decorating each call site.
 
 ## Development
 
