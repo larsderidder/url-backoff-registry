@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Callable, Dict, List, Optional, TypedDict, TypeVar, ParamSpec
+import sys
+from typing import Callable, Dict, List, Optional, TypeVar
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec, TypedDict
+else:
+    from typing_extensions import ParamSpec, TypedDict
 
 P = ParamSpec("P")
 R = TypeVar("R")
