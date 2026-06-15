@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 import sys
 from typing import Callable, Dict, List, Optional, TypeVar
@@ -20,7 +20,7 @@ ClockFn = Callable[[], datetime]
 
 
 def _utc_now() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
 
 
 @dataclass
@@ -73,9 +73,13 @@ class BackoffRegistry:
     ) -> None:
         """Set custom backoff rules for a specific key."""
         self._rules[key] = BackoffRule(
-            window_seconds=window_seconds if window_seconds is not None else self.window_seconds,
+            window_seconds=(
+                window_seconds if window_seconds is not None else self.window_seconds
+            ),
             threshold=threshold if threshold is not None else self.threshold,
-            backoff_seconds=backoff_seconds if backoff_seconds is not None else self.backoff_seconds,
+            backoff_seconds=(
+                backoff_seconds if backoff_seconds is not None else self.backoff_seconds
+            ),
         )
 
     def clear_rule(self, key: str) -> None:
@@ -88,11 +92,7 @@ class BackoffRegistry:
         window = timedelta(seconds=rule.window_seconds)
         now = self.clock()
 
-        issues = [
-            stamp
-            for stamp in self._issues.get(key, [])
-            if now <= stamp + window
-        ]
+        issues = [stamp for stamp in self._issues.get(key, []) if now <= stamp + window]
         issues.append(now)
         self._issues[key] = issues
 
@@ -104,10 +104,15 @@ class BackoffRegistry:
         until = self._backoff_until.get(key)
         if until is None:
             return False
-        return self.clock() < until
+        if self.clock() < until:
+            return True
+        self._backoff_until.pop(key, None)
+        return False
 
     def next_retry_at(self, key: str) -> Optional[datetime]:
         """Return the time when backoff ends, if any."""
+        if not self.should_backoff(key):
+            return None
         return self._backoff_until.get(key)
 
     def clear(self, key: str) -> None:
@@ -121,11 +126,9 @@ class BackoffRegistry:
         window = timedelta(seconds=rule.window_seconds)
         now = self.clock()
 
-        failures_in_window = len([
-            stamp
-            for stamp in self._issues.get(key, [])
-            if now <= stamp + window
-        ])
+        failures_in_window = len(
+            [stamp for stamp in self._issues.get(key, []) if now <= stamp + window]
+        )
 
         return BackoffStats(
             failures_in_window=failures_in_window,
@@ -134,7 +137,9 @@ class BackoffRegistry:
         )
 
     def keys(self) -> List[str]:
-        """Return all keys that have recorded failures or are in backoff."""
+        """Return all keys that have recorded failures or are in active backoff."""
+        for key in list(self._backoff_until):
+            self.should_backoff(key)
         return list(set(self._issues.keys()) | set(self._backoff_until.keys()))
 
     def track(
